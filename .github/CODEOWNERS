@@ -1,0 +1,6 @@
+# Review ownership — replace GitHub handles when the team accounts are known.
+/frontend/      @frontend-owner
+/backend/       @security-backend-owner
+/ai-service/    @ai-owner
+/tests/         @qa-owner
+/docs/          @security-backend-owner @qa-owner

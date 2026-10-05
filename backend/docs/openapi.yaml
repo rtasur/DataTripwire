@@ -1,0 +1,50 @@
+openapi: 3.0.3
+info:
+  title: DataTripwire API
+  version: 0.1.0
+  description: Shared API contract for the DataTripwire pre-production foundation.
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/v1/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Backend is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service: { type: string, example: backend }
+                  status: { type: string, example: ok }
+                  timestamp: { type: string, format: date-time }
+  /api/v1/auth/login:
+    post:
+      summary: Placeholder for authentication contract
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        '501':
+          description: Not implemented in the pre-production scaffold
+  /api/v1/security/events:
+    post:
+      summary: Placeholder for normalized security telemetry
+      responses:
+        '501':
+          description: Contract reserved for event ingestion
+  /api/v1/security/decision:
+    post:
+      summary: Placeholder for policy decision evaluation
+      responses:
+        '501':
+          description: Contract reserved for policy engine integration
