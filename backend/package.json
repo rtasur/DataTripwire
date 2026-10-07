@@ -9,9 +9,12 @@
     "test": "node --test"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "latest",
     "dotenv": "latest",
     "express": "latest",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.1",
     "swagger-ui-express": "latest",
     "yaml": "latest"
   }

@@ -1,0 +1,9 @@
+BEGIN;
+
+ALTER TABLE users
+ADD COLUMN password_hash TEXT;
+
+ALTER TABLE users
+ALTER COLUMN password_hash SET NOT NULL;
+
+COMMIT;
