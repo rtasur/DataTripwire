@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { requireAuth } from '../middleware/auth.js';
+import { requireActiveSession } from '../middleware/policy.js';
 
 import {
   createBehaviorEvent,
@@ -22,6 +23,7 @@ router.post(
 router.post(
   '/baseline/rebuild',
   requireAuth,
+  requireActiveSession,
   rebuildBaseline,
 );
 

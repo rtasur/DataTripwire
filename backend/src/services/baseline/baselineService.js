@@ -13,7 +13,7 @@ function average(values) {
 
 export async function calculateUserBaseline(userId) {
   const result = await pool.query(
-  `
+    `
     SELECT
       behavior_events.session_id,
       behavior_events.event_type,
@@ -27,11 +27,11 @@ export async function calculateUserBaseline(userId) {
     INNER JOIN sessions
       ON sessions.id = behavior_events.session_id
     WHERE behavior_events.user_id = $1
-      AND sessions.status IN ('active', 'ended')
+      AND sessions.baseline_eligible = TRUE
     ORDER BY behavior_events.occurred_at ASC
-  `,
-  [userId],
-);
+    `,
+    [userId],
+  );
 
   const events = result.rows;
 
@@ -40,10 +40,7 @@ export async function calculateUserBaseline(userId) {
   }
 
   /*
-   * ----------------------------------------------------------
    * LOGIN TIME BASELINE
-   * ----------------------------------------------------------
-   * Only explicit login events are used here.
    */
   const loginHours = events
     .filter((event) => event.event_type === 'login')
@@ -60,9 +57,7 @@ export async function calculateUserBaseline(userId) {
       : null;
 
   /*
-   * ----------------------------------------------------------
    * REQUEST VOLUME BASELINE
-   * ----------------------------------------------------------
    */
   const requestValues = events
     .map((event) => event.request_count)
@@ -74,20 +69,11 @@ export async function calculateUserBaseline(userId) {
     )
     .map(Number);
 
-  const avgRequestsPerMinute =
-    average(requestValues);
+  const avgRequestsPerMinute = average(requestValues);
 
   /*
-   * ----------------------------------------------------------
    * RESOURCES / SESSION
-   * ----------------------------------------------------------
    */
-  const sessionIds = new Set(
-    events
-      .map((event) => event.session_id)
-      .filter(Boolean),
-  );
-
   const resourcesBySession = new Map();
 
   for (const event of events) {
@@ -115,9 +101,7 @@ export async function calculateUserBaseline(userId) {
     average(resourceCounts);
 
   /*
-   * ----------------------------------------------------------
    * KNOWN DEVICES
-   * ----------------------------------------------------------
    */
   const knownDevices = [
     ...new Set(
@@ -128,9 +112,7 @@ export async function calculateUserBaseline(userId) {
   ];
 
   /*
-   * ----------------------------------------------------------
    * KNOWN LOCATIONS
-   * ----------------------------------------------------------
    */
   const knownLocations = [
     ...new Set(
@@ -141,33 +123,27 @@ export async function calculateUserBaseline(userId) {
   ];
 
   /*
- * ----------------------------------------------------------
- * COMMON RESOURCE TYPES
- * ----------------------------------------------------------
- * Resource semantics are supplied by the protected
- * application through normalized telemetry metadata.
- *
- * DataTripwire does not interpret application URL paths.
- */
-const commonResourceTypes = [
-  ...new Set(
-    events
-      .map((event) => {
-        const resourceType =
-          event.metadata?.resource_type;
+   * COMMON RESOURCE TYPES
+   */
+  const commonResourceTypes = [
+    ...new Set(
+      events
+        .map((event) => {
+          const resourceType =
+            event.metadata?.resource_type;
 
-        if (
-          typeof resourceType === 'string' &&
-          resourceType.trim()
-        ) {
-          return resourceType.trim().toLowerCase();
-        }
+          if (
+            typeof resourceType === 'string' &&
+            resourceType.trim()
+          ) {
+            return resourceType.trim().toLowerCase();
+          }
 
-        return null;
-      })
-      .filter(Boolean ),
-  ),
-];
+          return null;
+        })
+        .filter(Boolean),
+    ),
+  ];
 
   const baseline = {
     userId,
@@ -183,44 +159,44 @@ const commonResourceTypes = [
 
   await pool.query(
     `
-      INSERT INTO user_baselines (
-        user_id,
-        usual_login_hour_start,
-        usual_login_hour_end,
-        avg_requests_per_minute,
-        avg_resources_per_session,
-        known_devices,
-        known_locations,
-        common_resource_types,
-        sample_count,
-        calculated_at,
-        updated_at
-      )
-      VALUES (
-        $1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6::jsonb,
-        $7::jsonb,
-        $8::jsonb,
-        $9,
-        NOW(),
-        NOW()
-      )
-      ON CONFLICT (user_id)
-      DO UPDATE SET
-        usual_login_hour_start = EXCLUDED.usual_login_hour_start,
-        usual_login_hour_end = EXCLUDED.usual_login_hour_end,
-        avg_requests_per_minute = EXCLUDED.avg_requests_per_minute,
-        avg_resources_per_session = EXCLUDED.avg_resources_per_session,
-        known_devices = EXCLUDED.known_devices,
-        known_locations = EXCLUDED.known_locations,
-        common_resource_types = EXCLUDED.common_resource_types,
-        sample_count = EXCLUDED.sample_count,
-        calculated_at = NOW(),
-        updated_at = NOW()
+    INSERT INTO user_baselines (
+      user_id,
+      usual_login_hour_start,
+      usual_login_hour_end,
+      avg_requests_per_minute,
+      avg_resources_per_session,
+      known_devices,
+      known_locations,
+      common_resource_types,
+      sample_count,
+      calculated_at,
+      updated_at
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      $6::jsonb,
+      $7::jsonb,
+      $8::jsonb,
+      $9,
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (user_id)
+    DO UPDATE SET
+      usual_login_hour_start = EXCLUDED.usual_login_hour_start,
+      usual_login_hour_end = EXCLUDED.usual_login_hour_end,
+      avg_requests_per_minute = EXCLUDED.avg_requests_per_minute,
+      avg_resources_per_session = EXCLUDED.avg_resources_per_session,
+      known_devices = EXCLUDED.known_devices,
+      known_locations = EXCLUDED.known_locations,
+      common_resource_types = EXCLUDED.common_resource_types,
+      sample_count = EXCLUDED.sample_count,
+      calculated_at = NOW(),
+      updated_at = NOW()
     `,
     [
       userId,
@@ -240,25 +216,24 @@ const commonResourceTypes = [
 
 export async function getUserBaseline(userId) {
   const result = await pool.query(
-  `
+    `
     SELECT
-      behavior_events.session_id,
-      behavior_events.event_type,
-      behavior_events.resource,
-      behavior_events.device_id,
-      behavior_events.location,
-      behavior_events.request_count,
-      behavior_events.metadata,
-      behavior_events.occurred_at
-    FROM behavior_events
-    INNER JOIN sessions
-      ON sessions.id = behavior_events.session_id
-    WHERE behavior_events.user_id = $1
-      AND sessions.status IN ('active', 'ended')
-    ORDER BY behavior_events.occurred_at ASC
-  `,
-  [userId],
-);
+      user_id,
+      usual_login_hour_start,
+      usual_login_hour_end,
+      avg_requests_per_minute,
+      avg_resources_per_session,
+      known_devices,
+      known_locations,
+      common_resource_types,
+      sample_count,
+      calculated_at,
+      updated_at
+    FROM user_baselines
+    WHERE user_id = $1
+    `,
+    [userId],
+  );
 
   return result.rows[0] ?? null;
 }

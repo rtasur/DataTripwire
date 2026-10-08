@@ -46,6 +46,9 @@ export async function applyPolicy({
    *
    * DataTripwire does not decide whether that mechanism is
    * OTP, password re-entry, WebAuthn, MFA, etc.
+   *
+   * The session is also removed from baseline eligibility because
+   * the observed behavior has crossed the verification threshold.
    */
   if (decision === 'VERIFY') {
     await pool.query(
@@ -53,6 +56,7 @@ export async function applyPolicy({
       UPDATE sessions
       SET step_up_required = TRUE,
           step_up_verified_at = NULL,
+          baseline_eligible = FALSE,
           last_activity_at = NOW()
       WHERE id = $1
         AND user_id = $2
@@ -66,6 +70,7 @@ export async function applyPolicy({
       `
       UPDATE sessions
       SET status = 'restricted',
+          baseline_eligible = FALSE,
           last_activity_at = NOW()
       WHERE id = $1
         AND user_id = $2
@@ -79,6 +84,7 @@ export async function applyPolicy({
       `
       UPDATE sessions
       SET status = 'quarantined',
+          baseline_eligible = FALSE,
           last_activity_at = NOW()
       WHERE id = $1
         AND user_id = $2
@@ -92,7 +98,8 @@ export async function applyPolicy({
     SELECT
       status,
       step_up_required,
-      step_up_verified_at
+      step_up_verified_at,
+      baseline_eligible
     FROM sessions
     WHERE id = $1
       AND user_id = $2
@@ -112,5 +119,6 @@ export async function applyPolicy({
     sessionStatus,
     stepUpRequired,
     stepUpVerifiedAt,
+    baselineEligible: result.rows[0]?.baseline_eligible ?? false,
   };
 }
