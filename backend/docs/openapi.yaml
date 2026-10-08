@@ -1,13 +1,91 @@
 openapi: 3.0.3
+
 info:
   title: DataTripwire API
-  version: 0.1.0
-  description: Shared API contract for the DataTripwire pre-production foundation.
+  version: 1.0.0
+  description: |
+    DataTripwire continuous Zero Trust security engine.
+    Authentication uses JWT bearer tokens.
+
 servers:
   - url: http://localhost:3000
+
+tags:
+  - name: Health
+  - name: Authentication
+  - name: Security
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: employee@datatripwire.local
+        password:
+          type: string
+          format: password
+          example: password123
+
+    BehaviorEvent:
+      type: object
+      required:
+        - event_type
+      properties:
+        event_type:
+          type: string
+          example: access
+
+        resource:
+          type: string
+          example: /export
+
+        method:
+          type: string
+          example: GET
+
+        device_id:
+          type: string
+          example: unknown-device-777
+
+        location:
+          type: string
+          example: Delhi
+
+        request_count:
+          type: integer
+          minimum: 0
+          example: 20
+
+        metadata:
+          type: object
+          additionalProperties: true
+          example:
+            resource_type: sensitive_export
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
 paths:
+
   /api/v1/health:
     get:
+      tags:
+        - Health
       summary: Health check
       responses:
         '200':
@@ -17,34 +95,174 @@ paths:
               schema:
                 type: object
                 properties:
-                  service: { type: string, example: backend }
-                  status: { type: string, example: ok }
-                  timestamp: { type: string, format: date-time }
+                  service:
+                    type: string
+                    example: backend
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+
   /api/v1/auth/login:
     post:
-      summary: Placeholder for authentication contract
+      tags:
+        - Authentication
+      summary: Authenticate a user
+      description: Returns a JWT session token.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [email, password]
-              properties:
-                email: { type: string, format: email }
-                password: { type: string, format: password }
+              $ref: '#/components/schemas/LoginRequest'
       responses:
-        '501':
-          description: Not implemented in the pre-production scaffold
+        '200':
+          description: Authentication successful
+        '401':
+          description: Invalid credentials
+        '500':
+          description: Server error
+
+  /api/v1/auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user
+        '401':
+          description: Authentication required
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: End the current session
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+        '401':
+          description: Authentication required
+
   /api/v1/security/events:
     post:
-      summary: Placeholder for normalized security telemetry
+      tags:
+        - Security
+      summary: Record behavior telemetry and evaluate risk
+      description: |
+        Records a behavior event for the authenticated session.
+        DataTripwire evaluates the event against the user's personal
+        behavior baseline and applies the resulting policy decision.
+      security:
+        - bearerAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BehaviorEvent'
+
       responses:
-        '501':
-          description: Contract reserved for event ingestion
-  /api/v1/security/decision:
+        '201':
+          description: Behavior event processed and risk evaluated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event:
+                    type: object
+                  risk:
+                    type: object
+                    properties:
+                      previous_score:
+                        type: number
+                        example: 0
+                      new_score:
+                        type: number
+                        example: 52
+                      decision:
+                        type: string
+                        enum:
+                          - ALLOW
+                          - MONITOR
+                          - VERIFY
+                          - RESTRICT
+                          - QUARANTINE
+                        example: VERIFY
+                      factors:
+                        type: array
+                        items:
+                          type: object
+                      explanation:
+                        type: string
+                        example: New device detected. New location detected.
+
+                  policy:
+                    type: object
+                    properties:
+                      policyId:
+                        type: string
+                        example: default-zero-trust-v1
+                      decision:
+                        type: string
+                        example: VERIFY
+                      requiredAction:
+                        type: string
+                        example: STEP_UP_AUTH
+                      enforcement:
+                        type: string
+                        example: APPLICATION_HANDLED
+                      sessionStatus:
+                        type: string
+                        example: active
+                      stepUpRequired:
+                        type: boolean
+                        example: true
+                      stepUpVerifiedAt:
+                        type: string
+                        format: date-time
+                        nullable: true
+
+        '400':
+          description: Invalid behavior event
+        '401':
+          description: Authentication or session error
+        '500':
+          description: Behavior processing error
+
+  /api/v1/security/baseline:
+    get:
+      tags:
+        - Security
+      summary: Get the current user's behavior baseline
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User behavior baseline
+        '401':
+          description: Authentication required
+
+  /api/v1/security/baseline/rebuild:
     post:
-      summary: Placeholder for policy decision evaluation
+      tags:
+        - Security
+      summary: Rebuild the current user's behavior baseline
+      security:
+        - bearerAuth: []
       responses:
-        '501':
-          description: Contract reserved for policy engine integration
+        '200':
+          description: Baseline rebuilt
+        '401':
+          description: Authentication required
+        '500':
+          description: Baseline rebuild failed
